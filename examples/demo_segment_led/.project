@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>segment_led</name>
+	<name>demo_segment_led</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -29,4 +29,11 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>src</name>
+			<type>2</type>
+			<location>D:/workspace/STM32/f446re/project/segment_led/src</location>
+		</link>
+	</linkedResources>
 </projectDescription>

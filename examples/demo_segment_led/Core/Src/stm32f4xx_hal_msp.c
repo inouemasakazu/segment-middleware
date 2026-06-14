@@ -166,12 +166,12 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
 
 // }
 
-// /**
-//   * @brief UART MSP De-Initialization
-//   * This function freeze the hardware resources used in this example
-//   * @param huart: UART handle pointer
-//   * @retval None
-//   */
+/**
+  * @brief UART MSP De-Initialization
+  * This function freeze the hardware resources used in this example
+  * @param huart: UART handle pointer
+  * @retval None
+  */
 // void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
 // {
 //   if(huart->Instance==USART2)

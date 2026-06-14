@@ -27,7 +27,7 @@
 ### 1.2. 回路構成
 回路構成を以下に示す。  
 
-![circuit](images/seg_demo_circuit.jpg)
+![circuit](docs/images/seg_demo_circuit.jpg)
 
  
 ## 2. ソフトウェア構成
@@ -113,6 +113,6 @@ segment set 1234
 
 ### 3.2. 参考
 
-![demo1](images/seg_demo_1.jpg)
+![demo1](docs/images/seg_demo_1.jpg)
 
-![demo2](images/seg_demo_2.jpg)
+![demo2](docs/images/seg_demo_2.jpg)

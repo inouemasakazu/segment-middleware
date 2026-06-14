@@ -20,7 +20,7 @@
 #include "UART/uart.h"
 
 #include "display.h"
-#include "../segment/segment.h"
+#include "../../../../inc/segment.h"
 
 #include <stdio.h>
 #include <stdlib.h>

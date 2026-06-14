@@ -28,8 +28,7 @@
                 // "UNICODE",
                 // "_UNICODE"
                 "STM32F446xx",
-                "USE_HAL_DRIVER",
-                "CLI_DEBUG"
+                "USE_HAL_DRIVER"
             ],
 
             "intelliSenseMode": "gcc-arm"
