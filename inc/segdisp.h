@@ -40,6 +40,12 @@
 
 typedef enum
 {
+    SEGDISP_CONTROL_STATIC = 0,
+    SEGDISP_CONTROL_DYNAMIC
+} segdisp_control_e;
+
+typedef enum
+{
     SEGDISP_STATE_COMMON = 0,
     SEGDISP_STATE_HIDDEN,
     SEGDISP_STATE_BLINK
@@ -62,7 +68,7 @@ typedef struct
     uint8_t len;
     uint8_t pos;
 
-    uint16_t control;
+    segdisp_control_e control;
 
     uint32_t timer;
     uint32_t scan_cycle;
@@ -80,13 +86,25 @@ typedef struct
 /****************************************************************************************************
  * Public Prototype Declaration
  ****************************************************************************************************/
-int segdisp_init(segdisp_t *segdisp, uint8_t length);
+
+/**
+ * @brief セグメントディスプレイ初期化
+ * @param segdisp セグメントディスプレイの制御データを保持するメモリ領域
+ * @param segment セグメント数
+ * @param digit   桁数
+ * @return 処理結果
+ */
+int segdisp_init(segdisp_t *segdisp, uint8_t segment, uint8_t digit);
 
 int segdisp_set_draw_cb(segdisp_t *segdisp, draw_cb_t cb);
 int segdisp_set_encode_cb(segdisp_t *segdisp, encode_cb_t cb);
 
-int segdisp_set_static_control(segdisp_t *segdisp);
-int segdisp_set_dynamic_control(segdisp_t *segdisp);
+/**
+ * @brief 制御方式の設定
+ * @param control 制御方式(STATIC or DYNAMIC)
+ * @return 処理結果
+ */
+int segdisp_set_control(segdisp_t *segdisp, segdisp_control_e control);
 
 /***
  * @brief 状態・描画の更新

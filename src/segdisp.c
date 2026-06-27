@@ -28,8 +28,6 @@
 #define SEG_VISIBLE_OFF             false
 #define SEG_VISIBLE_ON              true
 
-#define SEG_STATIC_CONTROL          0
-#define SEG_DYNAMIC_CONTROL         1
 
 /****************************************************************************************************
  * Private typedef
@@ -47,37 +45,34 @@ static void segdisp_call_draw_cb(segdisp_t *segdisp, uint8_t length, uint8_t pos
 static void segdisp_enter_dynamic_mode(segdisp_t *segdisp);
 static void segdisp_enter_static_mode(segdisp_t *segdisp);
 
-/***
- * @brief  セグメント状態の初期化
- * @param  segdisp セグメント状態のメモリ領域
- * @param  length 使用する桁長
+/**
+ * @brief セグメントディスプレイ初期化
+ * @param segdisp セグメントディスプレイの制御データを保持するメモリ領域
+ * @param segment セグメント数
+ * @param digit   桁数
  * @return 処理結果
  */
-int segdisp_init(segdisp_t *segdisp, uint8_t length)
+int segdisp_init(segdisp_t *segdisp, uint8_t segment, uint8_t digit)
 {
-    if (segdisp == NULL) return SEG_ARG_ERROR;
-    if ((length == 0) || (SEGDISP_DIGIT_MAX < length)) return SEG_ARG_ERROR;
+    int success = SEG_OK;
 
-    for (size_t i = 0; i < SEGDISP_DIGIT_MAX; i++)
+    if ((segdisp == NULL)
+    ||  ((0 == digit) || (SEGDISP_DIGIT_MAX <= digit)))
     {
-        segdisp->digit[i].pattern = 0x00000000;             /* bitパターンは0クリア */
-        segdisp->digit[i].state   = SEGDISP_STATE_COMMON;   /* 通常表示 */
-        segdisp->digit[i].blink_cycle = 1000;               /* 1000ms cycle */
+        success = SEG_ARG_ERROR;
+    }
+    else
+    {
+        /* メモリ0クリア */
+        memset(segdisp, 0, sizeof(segdisp_t));
+
+        /* 制御方式設定(デフォルトはSTATIC) */
+        segdisp_set_control(segdisp, SEGDISP_CONTROL_STATIC);
+
+        segdisp->len = digit;
     }
 
-    segdisp->len = length;
-    segdisp->pos = 0;
-
-    segdisp->control = SEG_STATIC_CONTROL;      /* 初期状態はstatic制御 */
-
-    segdisp->timer      = 0;
-    segdisp->scan_cycle = SEGDISP_SCAN_CYCLE_DEFAULT_MS;
-    segdisp->last_scan  = 0;
-
-    segdisp->draw_cb = NULL;
-    segdisp->encode_cb = NULL;
-
-    return SEG_OK;
+    return success;
 }
 
 /***
@@ -126,7 +121,7 @@ int segdisp_update(segdisp_t *segdisp, uint32_t period)
 
     segdisp->timer += period;
 
-    if (segdisp->control == SEG_DYNAMIC_CONTROL)
+    if (SEGDISP_CONTROL_DYNAMIC == segdisp->control)
     {
         /* ダイナミック制御は描画更新のため周期判定を行う */
         if ((segdisp->timer - segdisp->last_scan) >= segdisp->scan_cycle)
@@ -283,28 +278,39 @@ int segdisp_set_pattern(segdisp_t *segdisp, uint8_t digit, uint32_t pattern)
     return SEG_OK;
 }
 
-/***
- * @brief ダイナミック制御モードへの移行
+/**
+ * @brief 制御方式の設定
+ * @param control 制御方式(STATIC or DYNAMIC)
+ * @return 処理結果
  */
-int segdisp_set_dynamic_control(segdisp_t *segdisp)
+int segdisp_set_control(segdisp_t *segdisp, segdisp_control_e control)
 {
-    if (segdisp == NULL) return SEG_ARG_ERROR;
+    int success = SEG_OK;
 
-    segdisp_enter_dynamic_mode(segdisp);
+    if (segdisp == NULL)
+    {
+        success = SEG_ARG_ERROR;
+    }
+    else
+    {
+        /* 制御方式設定 */
+        switch (control)
+        {
+        case SEGDISP_CONTROL_STATIC:
+            segdisp_enter_static_mode(segdisp);
+            break;
 
-    return SEG_OK;
-}
+        case SEGDISP_CONTROL_DYNAMIC:
+            segdisp_enter_dynamic_mode(segdisp);
+            break;
 
-/***
- * @brief スタティック制御モードへの移行
- */
-int segdisp_set_static_control(segdisp_t *segdisp)
-{
-    if (segdisp == NULL) return SEG_ARG_ERROR;
+        default:
+            success = SEG_NG;
+            break;
+        }
+    }
 
-    segdisp_enter_static_mode(segdisp);
-
-    return SEG_OK;
+    return success;
 }
 
 /***
@@ -313,10 +319,11 @@ int segdisp_set_static_control(segdisp_t *segdisp)
 static void segdisp_enter_dynamic_mode(segdisp_t *segdisp)
 {
     /* ダイナミック制御用パラメータ初期化 */
-    segdisp->control = SEG_DYNAMIC_CONTROL;
+    segdisp->control = SEGDISP_CONTROL_DYNAMIC;
+
+    segdisp->pos        = 0;
     segdisp->scan_cycle = SEGDISP_SCAN_CYCLE_DEFAULT_MS;
     segdisp->last_scan  = segdisp->timer;
-    segdisp->pos        = 0;
 }
 
 /***
@@ -325,7 +332,7 @@ static void segdisp_enter_dynamic_mode(segdisp_t *segdisp)
 static void segdisp_enter_static_mode(segdisp_t *segdisp)
 {
     /* スタティック制御用パラメータ初期化 */
-    segdisp->control = SEG_STATIC_CONTROL;
+    segdisp->control = SEGDISP_CONTROL_STATIC;
 }
 
 /***
@@ -451,10 +458,9 @@ int segdisp_blink_off(segdisp_t *segdisp, uint16_t digit)
     return SEG_OK;
 }
 
-/***
- * @brief スキャン周期設定処理
- * @param segdisp セグメント状態のメモリ領域
- * @param value 設定値
+/**
+ * @brief スキャン周期設定
+ * @param value 周期
  */
 int segdisp_set_scan_cycle(segdisp_t *segdisp, uint32_t value)
 {
