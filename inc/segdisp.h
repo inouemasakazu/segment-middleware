@@ -96,8 +96,40 @@ typedef struct
  */
 int segdisp_init(segdisp_t *segdisp, uint8_t segment, uint8_t digit);
 
-int segdisp_set_draw_cb(segdisp_t *segdisp, draw_cb_t cb);
-int segdisp_set_encode_cb(segdisp_t *segdisp, encode_cb_t cb);
+/**
+ * @brief 更新処理
+ * @param  period 内部タイマーの更新周期
+ * @return 処理結果
+ */
+int segdisp_update(segdisp_t *segdisp, uint32_t period);
+
+
+int segdisp_hidden_on(segdisp_t *segdisp, uint16_t digit);
+int segdisp_hidden_off(segdisp_t *segdisp, uint16_t digit);
+
+int segdisp_blink_on(segdisp_t *segdisp, uint16_t digit, uint32_t cycle);
+int segdisp_blink_off(segdisp_t *segdisp, uint16_t digit);
+
+
+/********************
+ * Setter functions
+ ********************/
+
+/**
+ * @brief セグメントパターン設定
+ * @param digit   設定対象の桁
+ * @param pattern セグメントのbitパターン
+ * @return 処理結果
+ */
+int segdisp_set_pattern(segdisp_t *segdisp, uint8_t digit, uint32_t pattern);
+
+/**
+ * @brief textデータ設定
+ *        セグメントディスプレイに表示するデータをtextデータからbitパターンにエンコードする。
+ * @param text textデータのメモリ領域
+ * @return 処理結果
+ */
+int segdisp_set_text(segdisp_t *segdisp, const uint8_t *text);
 
 /**
  * @brief 制御方式の設定
@@ -106,20 +138,25 @@ int segdisp_set_encode_cb(segdisp_t *segdisp, encode_cb_t cb);
  */
 int segdisp_set_control(segdisp_t *segdisp, segdisp_control_e control);
 
-/***
- * @brief 状態・描画の更新
+/**
+ * @brief スキャン周期設定
+ * @param value 周期
+ * @return 処理結果
  */
-int segdisp_update(segdisp_t *segdisp, uint32_t period);
-
-int segdisp_set_text(segdisp_t *segdisp, const uint8_t *text);
-int segdisp_set_pattern(segdisp_t *segdisp, uint8_t digit, uint32_t pattern);
-
-int segdisp_hidden_on(segdisp_t *segdisp, uint16_t digit);
-int segdisp_hidden_off(segdisp_t *segdisp, uint16_t digit);
-
-int segdisp_blink_on(segdisp_t *segdisp, uint16_t digit, uint32_t cycle);
-int segdisp_blink_off(segdisp_t *segdisp, uint16_t digit);
-
 int segdisp_set_scan_cycle(segdisp_t *segdisp, uint32_t value);
+
+/**
+ * @brief 描画コールバック設定
+ * @param cb コールバックのポインタ
+ * @return 処理結果
+ */
+int segdisp_set_draw_cb(segdisp_t *segdisp, draw_cb_t cb);
+
+/**
+ * @brief テキストデータのエンコードコールバック設定
+ * @param cb コールバックのポインタ
+ * @return 処理結果
+ */
+int segdisp_set_encode_cb(segdisp_t *segdisp, encode_cb_t cb);
 
 #endif  /* __SEGDISP_H__ */

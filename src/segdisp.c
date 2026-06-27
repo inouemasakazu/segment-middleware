@@ -75,40 +75,10 @@ int segdisp_init(segdisp_t *segdisp, uint8_t segment, uint8_t digit)
     return success;
 }
 
-/***
- * @brief  描画コールバック登録
- * @param  segdisp セグメント状態のメモリ領域
- * @param  cb  コールバック関数のメモリ領域
- * @return 処理結果
- */
-int segdisp_set_draw_cb(segdisp_t *segdisp, draw_cb_t cb)
-{
-    if (segdisp == NULL) return SEG_ARG_ERROR;
-
-    segdisp->draw_cb = cb;
-
-    return SEG_OK;
-}
-
-/***
- * @brief  エンコードコールバック登録
- * @param  segdisp セグメント状態のメモリ領域
- * @param  cb  コールバック関数のメモリ領域
- * @return 処理結果
- */
-int segdisp_set_encode_cb(segdisp_t *segdisp, encode_cb_t cb)
-{
-    if (segdisp == NULL) return SEG_ARG_ERROR;
-
-    segdisp->encode_cb = cb;
-
-    return SEG_OK;
-}
-
-/***
- * @brief  更新処理
- * @param  segdisp セグメント状態のメモリ領域
- * @param  period 内部タイマーの更新周期
+/**
+ * @brief 更新処理
+ * @param segdisp セグメントディスプレイの制御データを保持するメモリ領域
+ * @param period  内部タイマーの更新周期
  * @return 処理結果
  */
 int segdisp_update(segdisp_t *segdisp, uint32_t period)
@@ -195,144 +165,6 @@ static void segdisp_call_draw_cb(segdisp_t *segdisp, uint8_t length, uint8_t pos
         /* 描画コールバック呼び出し */
         segdisp->draw_cb(&buf[0], length, position);
     }
-}
-
-/***
- * @brief  テキスト設定
- * @param segdisp セグメント状態のメモリ領域
- * @param text 設定するテキストのメモリ領域
- * @return 処理結果
- */
-int segdisp_set_text(segdisp_t *segdisp, const uint8_t *text)
-{
-    if ((segdisp == NULL) || (*text == '\0')) return SEG_ARG_ERROR;
-
-    if (segdisp->encode_cb == NULL)
-    {
-        return SEG_NG;
-    }
-    else
-    {
-        uint32_t temp[SEGDISP_DIGIT_MAX] = {0};
-        uint32_t pattern[SEGDISP_DIGIT_MAX] = {0};
-        uint8_t length = segdisp->encode_cb(text, temp);
-
-        if (length > segdisp->len)
-        {
-            /* エンコード後の文字数がセグメントの桁数を超える場合は、セグメントの桁数に合わせる */
-            memcpy(&pattern[0], &temp[0], segdisp->len * sizeof(uint32_t));
-        }
-        else if (length < segdisp->len)
-        {
-            /* エンコード後の文字数がセグメントの桁数より少ない場合は、先頭を空白とする */
-            memcpy(&pattern[segdisp->len - length], &temp[0], length * sizeof(uint32_t));
-        }
-        else
-        {
-            /* エンコード後の文字数がセグメントの桁数と同数の場合は、そのままコピー */
-            memcpy(&pattern[0], &temp[0], length * sizeof(uint32_t));
-        }
-
-        if (length > 0)
-        {
-            for (size_t i = 0; i < segdisp->len; i++)
-            {
-                /* bitパターン設定 */
-                segdisp_set_pattern(segdisp, (i + 1), pattern[i]);
-            }
-        }
-    }
-
-    return SEG_OK;
-}
-
-/***
- * @brief bitパターン設定
- * @param segdisp セグメント状態のメモリ領域
- * @param digit 桁位置(1～) / 0は全桁
- * @param pattern bitパターン
- */
-int segdisp_set_pattern(segdisp_t *segdisp, uint8_t digit, uint32_t pattern)
-{
-    if (segdisp == NULL) return SEG_ARG_ERROR;
-
-    if (digit == 0)
-    {
-        /* 全桁の点滅設定 */
-        for (size_t i = 0; i < segdisp->len; i++)
-        {
-            segdisp->digit[i].pattern = pattern;
-        }
-    }
-    else
-    {
-        uint8_t index = (digit - 1);
-
-        if (index < segdisp->len)
-        {
-            /* 指定桁の点滅設定 */
-            segdisp->digit[index].pattern = pattern;
-        }
-    }
-
-    return SEG_OK;
-}
-
-/**
- * @brief 制御方式の設定
- * @param control 制御方式(STATIC or DYNAMIC)
- * @return 処理結果
- */
-int segdisp_set_control(segdisp_t *segdisp, segdisp_control_e control)
-{
-    int success = SEG_OK;
-
-    if (segdisp == NULL)
-    {
-        success = SEG_ARG_ERROR;
-    }
-    else
-    {
-        /* 制御方式設定 */
-        switch (control)
-        {
-        case SEGDISP_CONTROL_STATIC:
-            segdisp_enter_static_mode(segdisp);
-            break;
-
-        case SEGDISP_CONTROL_DYNAMIC:
-            segdisp_enter_dynamic_mode(segdisp);
-            break;
-
-        default:
-            success = SEG_NG;
-            break;
-        }
-    }
-
-    return success;
-}
-
-/***
- * @brief ダイナミック制御モードへの移行
- */
-static void segdisp_enter_dynamic_mode(segdisp_t *segdisp)
-{
-    /* ダイナミック制御用パラメータ初期化 */
-    segdisp->control = SEGDISP_CONTROL_DYNAMIC;
-
-    segdisp->pos        = 0;
-    segdisp->scan_cycle = SEGDISP_SCAN_CYCLE_DEFAULT_MS;
-    segdisp->last_scan  = segdisp->timer;
-}
-
-/***
- * @brief スタティック制御モードへの移行
- */
-static void segdisp_enter_static_mode(segdisp_t *segdisp)
-{
-    /* スタティック制御用パラメータ初期化 */
-    segdisp->control = SEGDISP_CONTROL_STATIC;
 }
 
 /***
@@ -459,8 +291,147 @@ int segdisp_blink_off(segdisp_t *segdisp, uint16_t digit)
 }
 
 /**
+ * @brief セグメントパターン設定
+ * @param digit   設定対象の桁
+ * @param pattern セグメントのbitパターン
+ * @return 処理結果
+ */
+int segdisp_set_pattern(segdisp_t *segdisp, uint8_t digit, uint32_t pattern)
+{
+    if (segdisp == NULL) return SEG_ARG_ERROR;
+
+    if (digit == 0)
+    {
+        /* 全桁の点滅設定 */
+        for (size_t i = 0; i < segdisp->len; i++)
+        {
+            segdisp->digit[i].pattern = pattern;
+        }
+    }
+    else
+    {
+        uint8_t index = (digit - 1);
+
+        if (index < segdisp->len)
+        {
+            /* 指定桁の点滅設定 */
+            segdisp->digit[index].pattern = pattern;
+        }
+    }
+
+    return SEG_OK;
+}
+
+/**
+ * @brief textデータ設定
+ *        セグメントディスプレイに表示するデータをtextデータからbitパターンにエンコードする。
+ * @param text textデータのメモリ領域
+ * @return 処理結果
+ */
+int segdisp_set_text(segdisp_t *segdisp, const uint8_t *text)
+{
+    if ((segdisp == NULL) || (*text == '\0')) return SEG_ARG_ERROR;
+
+    if (segdisp->encode_cb == NULL)
+    {
+        return SEG_NG;
+    }
+    else
+    {
+        uint32_t temp[SEGDISP_DIGIT_MAX] = {0};
+        uint32_t pattern[SEGDISP_DIGIT_MAX] = {0};
+        uint8_t length = segdisp->encode_cb(text, temp);
+
+        if (length > segdisp->len)
+        {
+            /* エンコード後の文字数がセグメントの桁数を超える場合は、セグメントの桁数に合わせる */
+            memcpy(&pattern[0], &temp[0], segdisp->len * sizeof(uint32_t));
+        }
+        else if (length < segdisp->len)
+        {
+            /* エンコード後の文字数がセグメントの桁数より少ない場合は、先頭を空白とする */
+            memcpy(&pattern[segdisp->len - length], &temp[0], length * sizeof(uint32_t));
+        }
+        else
+        {
+            /* エンコード後の文字数がセグメントの桁数と同数の場合は、そのままコピー */
+            memcpy(&pattern[0], &temp[0], length * sizeof(uint32_t));
+        }
+
+        if (length > 0)
+        {
+            for (size_t i = 0; i < segdisp->len; i++)
+            {
+                /* bitパターン設定 */
+                segdisp_set_pattern(segdisp, (i + 1), pattern[i]);
+            }
+        }
+    }
+
+    return SEG_OK;
+}
+
+/**
+ * @brief 制御方式の設定
+ * @param control 制御方式(STATIC or DYNAMIC)
+ * @return 処理結果
+ */
+int segdisp_set_control(segdisp_t *segdisp, segdisp_control_e control)
+{
+    int success = SEG_OK;
+
+    if (segdisp == NULL)
+    {
+        success = SEG_ARG_ERROR;
+    }
+    else
+    {
+        /* 制御方式設定 */
+        switch (control)
+        {
+        case SEGDISP_CONTROL_STATIC:
+            segdisp_enter_static_mode(segdisp);
+            break;
+
+        case SEGDISP_CONTROL_DYNAMIC:
+            segdisp_enter_dynamic_mode(segdisp);
+            break;
+
+        default:
+            success = SEG_NG;
+            break;
+        }
+    }
+
+    return success;
+}
+
+/**
+ * @brief ダイナミック制御モードへの移行
+ */
+static void segdisp_enter_dynamic_mode(segdisp_t *segdisp)
+{
+    /* ダイナミック制御用パラメータ初期化 */
+    segdisp->control = SEGDISP_CONTROL_DYNAMIC;
+
+    segdisp->pos        = 0;
+    segdisp->scan_cycle = SEGDISP_SCAN_CYCLE_DEFAULT_MS;
+    segdisp->last_scan  = segdisp->timer;
+}
+
+/**
+ * @brief スタティック制御モードへの移行
+ */
+static void segdisp_enter_static_mode(segdisp_t *segdisp)
+{
+    /* スタティック制御用パラメータ初期化 */
+    segdisp->control = SEGDISP_CONTROL_STATIC;
+}
+
+/**
  * @brief スキャン周期設定
  * @param value 周期
+ * @return 処理結果
  */
 int segdisp_set_scan_cycle(segdisp_t *segdisp, uint32_t value)
 {
@@ -470,6 +441,34 @@ int segdisp_set_scan_cycle(segdisp_t *segdisp, uint32_t value)
     {
         segdisp->scan_cycle = value;
     }
+
+    return SEG_OK;
+}
+
+/**
+ * @brief 描画コールバック設定
+ * @param cb コールバックのポインタ
+ * @return 処理結果
+ */
+int segdisp_set_draw_cb(segdisp_t *segdisp, draw_cb_t cb)
+{
+    if (segdisp == NULL) return SEG_ARG_ERROR;
+
+    segdisp->draw_cb = cb;
+
+    return SEG_OK;
+}
+
+/**
+ * @brief テキストデータのエンコードコールバック設定
+ * @param cb コールバックのポインタ
+ * @return 処理結果
+ */
+int segdisp_set_encode_cb(segdisp_t *segdisp, encode_cb_t cb)
+{
+    if (segdisp == NULL) return SEG_ARG_ERROR;
+
+    segdisp->encode_cb = cb;
 
     return SEG_OK;
 }
