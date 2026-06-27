@@ -1,5 +1,5 @@
 /****************************************************************************************************
- * @file    segment.c
+ * @file    segdisp.c
  * @brief   セグメントLED制御モジュール
  * @details このファイルにはセグメントLEDの制御機能を提供するモジュールを定義。
  *
@@ -14,7 +14,7 @@
 /****************************************************************************************************
  * Private include
  ****************************************************************************************************/
-#include "../inc/segment.h"
+#include "../inc/segdisp.h"
 
 #include <string.h>
 #include <stdbool.h>
@@ -46,103 +46,100 @@
 /****************************************************************************************************
  * Private Prototype Declaration
  ****************************************************************************************************/
-static void seg_call_draw_cb(seg_ctx_t *ctx, uint8_t length, uint8_t position);
+static void segdisp_call_draw_cb(segdisp_t *segdisp, uint8_t length, uint8_t position);
 
-static void seg_enter_dynamic_mode(seg_ctx_t *ctx);
-static void seg_enter_static_mode(seg_ctx_t *ctx);
+static void segdisp_enter_dynamic_mode(segdisp_t *segdisp);
+static void segdisp_enter_static_mode(segdisp_t *segdisp);
 
 /***
- * @name   seg_init
  * @brief  セグメント状態の初期化
- * @param  ctx セグメント状態のメモリ領域
+ * @param  segdisp セグメント状態のメモリ領域
  * @param  length 使用する桁長
  * @return 処理結果
  */
-int seg_init(seg_ctx_t *ctx, uint8_t length)
+int segdisp_init(segdisp_t *segdisp, uint8_t length)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
-    if ((length == 0) || (SEG_DIGIT_LENGTH < length)) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
+    if ((length == 0) || (SEGDISP_DIGIT_MAX < length)) return SEG_ARG_ERROR;
 
-    for (size_t i = 0; i < SEG_DIGIT_LENGTH; i++)
+    for (size_t i = 0; i < SEGDISP_DIGIT_MAX; i++)
     {
-        ctx->digit[i].pattern = 0x00000000;             /* bitパターンは0クリア */
-        ctx->digit[i].state   = SEG_STATE_COMMON;       /* 通常表示 */
-        ctx->digit[i].blink_cycle = 1000;               /* 1000ms cycle */
+        segdisp->digit[i].pattern = 0x00000000;             /* bitパターンは0クリア */
+        segdisp->digit[i].state   = SEGDISP_STATE_COMMON;   /* 通常表示 */
+        segdisp->digit[i].blink_cycle = 1000;               /* 1000ms cycle */
     }
 
-    ctx->len = length;
-    ctx->pos = 0;
+    segdisp->len = length;
+    segdisp->pos = 0;
 
-    ctx->control = SEG_STATIC_CONTROL;      /* 初期状態はstatic制御 */
+    segdisp->control = SEG_STATIC_CONTROL;      /* 初期状態はstatic制御 */
 
-    ctx->timer      = 0;
-    ctx->scan_cycle = SEG_SCAN_CYCLE_DEFAULT_MS;
-    ctx->last_scan  = 0;
+    segdisp->timer      = 0;
+    segdisp->scan_cycle = SEGDISP_SCAN_CYCLE_DEFAULT_MS;
+    segdisp->last_scan  = 0;
 
-    ctx->draw_cb = NULL;
-    ctx->encode_cb = NULL;
+    segdisp->draw_cb = NULL;
+    segdisp->encode_cb = NULL;
 
     return SEG_OK;
 }
 
 /***
- * @name   seg_set_draw_cb
  * @brief  描画コールバック登録
- * @param  ctx セグメント状態のメモリ領域
+ * @param  segdisp セグメント状態のメモリ領域
  * @param  cb  コールバック関数のメモリ領域
  * @return 処理結果
  */
-int seg_set_draw_cb(seg_ctx_t *ctx, segment_draw_cb_t cb)
+int segdisp_set_draw_cb(segdisp_t *segdisp, draw_cb_t cb)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
-    ctx->draw_cb = cb;
+    segdisp->draw_cb = cb;
 
     return SEG_OK;
 }
 
 /***
- * @name   seg_set_encode_cb
  * @brief  エンコードコールバック登録
- * @param  ctx セグメント状態のメモリ領域
+ * @param  segdisp セグメント状態のメモリ領域
  * @param  cb  コールバック関数のメモリ領域
  * @return 処理結果
  */
-int seg_set_encode_cb(seg_ctx_t *ctx, segment_encode_cb_t cb)
+int segdisp_set_encode_cb(segdisp_t *segdisp, encode_cb_t cb)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
-    ctx->encode_cb = cb;
+    segdisp->encode_cb = cb;
 
     return SEG_OK;
 }
 
 /***
  * @brief  更新処理
- * @param  ctx セグメント状態のメモリ領域
+ * @param  segdisp セグメント状態のメモリ領域
  * @param  period 内部タイマーの更新周期
  * @return 処理結果
  */
-int seg_update(seg_ctx_t *ctx, uint32_t period)
+int segdisp_update(segdisp_t *segdisp, uint32_t period)
 {
     uint8_t len = 0;
     uint8_t pos = 0;
     bool update = SEG_UPDATE_ON;
 
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
-    ctx->timer += period;
+    segdisp->timer += period;
 
-    if (ctx->control == SEG_DYNAMIC_CONTROL)
+    if (segdisp->control == SEG_DYNAMIC_CONTROL)
     {
         /* ダイナミック制御は描画更新のため周期判定を行う */
-        if ((ctx->timer - ctx->last_scan) >= ctx->scan_cycle)
+        if ((segdisp->timer - segdisp->last_scan) >= segdisp->scan_cycle)
         {
-            ctx->last_scan += ctx->scan_cycle;
+            segdisp->last_scan += segdisp->scan_cycle;
 
             len = 1;
-            pos = ctx->pos;
-            ctx->pos = (ctx->pos + 1) % ctx->len;   /* scan位置の更新 */
+            pos = segdisp->pos;
+            segdisp->pos = (segdisp->pos + 1) % segdisp->len;   /* scan位置の更新 */
         }
         else
         {
@@ -153,92 +150,91 @@ int seg_update(seg_ctx_t *ctx, uint32_t period)
     else
     {
         /* スタティック制御は条件なし、無条件更新 */
-        len = ctx->len;
+        len = segdisp->len;
     }
 
     if (update == SEG_UPDATE_ON)
     {
         /* 描画更新 */
-        seg_call_draw_cb(ctx, len, pos);
+        segdisp_call_draw_cb(segdisp, len, pos);
     }
 
     return SEG_OK;
 }
 
 /***
- * @name  seg_call_draw_cb
  * @brief 描画コールバック呼び出し
  *        描画データの生成、及びコールバック処理の起動
- * @param ctx セグメント状態のメモリ領域
+ * @param segdisp セグメント状態のメモリ領域
  * @param length 描画データ長
  * @param position 描画データ位置
  */
-static void seg_call_draw_cb(seg_ctx_t *ctx, uint8_t length, uint8_t position)
+static void segdisp_call_draw_cb(segdisp_t *segdisp, uint8_t length, uint8_t position)
 {
-    uint32_t buf[SEG_DIGIT_LENGTH];
+    uint32_t buf[SEGDISP_DIGIT_MAX];
 
     bool is_visible;
 
     for (size_t i = 0; i < length; i++)
     {
-        switch (ctx->digit[(position + i)].state)
+        switch (segdisp->digit[(position + i)].state)
         {
-        case SEG_STATE_HIDDEN:
+        case SEGDISP_STATE_HIDDEN:
             /* 非表示設定 */
             is_visible = SEG_VISIBLE_OFF;
             break;
 
-        case SEG_STATE_BLINK:
+        case SEGDISP_STATE_BLINK:
             /* 点滅設定 */
-            is_visible = (((ctx->timer / ctx->digit[(position + i)].blink_cycle) % 2) == 0);
+            is_visible = (((segdisp->timer / segdisp->digit[(position + i)].blink_cycle) % 2) == 0);
             break;
 
-        case SEG_STATE_COMMON:
+        case SEGDISP_STATE_COMMON:
         default:
             /* 表示状態の指定なし */
             is_visible = SEG_VISIBLE_ON;
             break;
         }
 
-        buf[i] = is_visible ? ctx->digit[(position + i)].pattern : 0;
+        buf[i] = is_visible ? segdisp->digit[(position + i)].pattern : 0;
     }
 
-    if (ctx->draw_cb != NULL)
+    if (segdisp->draw_cb != NULL)
     {
         /* 描画コールバック呼び出し */
-        ctx->draw_cb(&buf[0], length, position);
+        segdisp->draw_cb(&buf[0], length, position);
     }
 }
 
 /***
  * @brief  テキスト設定
- * @param ctx セグメント状態のメモリ領域
+ * @param segdisp セグメント状態のメモリ領域
  * @param text 設定するテキストのメモリ領域
  * @return 処理結果
  */
-int seg_set_text(seg_ctx_t *ctx, const uint8_t *text)
+int segdisp_set_text(segdisp_t *segdisp, const uint8_t *text)
 {
-    if ((ctx == NULL) || (*text == '\0')) return SEG_ARG_ERROR;
+    if ((segdisp == NULL) || (*text == '\0')) return SEG_ARG_ERROR;
 
-    if (ctx->encode_cb == NULL)
+    if (segdisp->encode_cb == NULL)
     {
         return SEG_NG;
     }
     else
     {
-        uint32_t temp[SEG_DIGIT_LENGTH] = {0};
-        uint32_t pattern[SEG_DIGIT_LENGTH] = {0};
-        uint8_t length = ctx->encode_cb(text, temp);
+        uint32_t temp[SEGDISP_DIGIT_MAX] = {0};
+        uint32_t pattern[SEGDISP_DIGIT_MAX] = {0};
+        uint8_t length = segdisp->encode_cb(text, temp);
 
-        if (length > ctx->len)
+        if (length > segdisp->len)
         {
             /* エンコード後の文字数がセグメントの桁数を超える場合は、セグメントの桁数に合わせる */
-            memcpy(&pattern[0], &temp[0], ctx->len * sizeof(uint32_t));
+            memcpy(&pattern[0], &temp[0], segdisp->len * sizeof(uint32_t));
         }
-        else if (length < ctx->len)
+        else if (length < segdisp->len)
         {
             /* エンコード後の文字数がセグメントの桁数より少ない場合は、先頭を空白とする */
-            memcpy(&pattern[ctx->len - length], &temp[0], length * sizeof(uint32_t));
+            memcpy(&pattern[segdisp->len - length], &temp[0], length * sizeof(uint32_t));
         }
         else
         {
@@ -248,10 +244,10 @@ int seg_set_text(seg_ctx_t *ctx, const uint8_t *text)
 
         if (length > 0)
         {
-            for (size_t i = 0; i < ctx->len; i++)
+            for (size_t i = 0; i < segdisp->len; i++)
             {
                 /* bitパターン設定 */
-                seg_set_pattern(ctx, (i + 1), pattern[i]);
+                segdisp_set_pattern(segdisp, (i + 1), pattern[i]);
             }
         }
     }
@@ -261,30 +257,30 @@ int seg_set_text(seg_ctx_t *ctx, const uint8_t *text)
 
 /***
  * @brief bitパターン設定
- * @param ctx セグメント状態のメモリ領域
+ * @param segdisp セグメント状態のメモリ領域
  * @param digit 桁位置(1～) / 0は全桁
  * @param pattern bitパターン
  */
-int seg_set_pattern(seg_ctx_t *ctx, uint8_t digit, uint32_t pattern)
+int segdisp_set_pattern(segdisp_t *segdisp, uint8_t digit, uint32_t pattern)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
     if (digit == 0)
     {
         /* 全桁の点滅設定 */
-        for (size_t i = 0; i < ctx->len; i++)
+        for (size_t i = 0; i < segdisp->len; i++)
         {
-            ctx->digit[i].pattern = pattern;
+            segdisp->digit[i].pattern = pattern;
         }
     }
     else
     {
         uint8_t index = (digit - 1);
 
-        if (index < ctx->len)
+        if (index < segdisp->len)
         {
             /* 指定桁の点滅設定 */
-            ctx->digit[index].pattern = pattern;
+            segdisp->digit[index].pattern = pattern;
         }
     }
 
@@ -294,11 +290,11 @@ int seg_set_pattern(seg_ctx_t *ctx, uint8_t digit, uint32_t pattern)
 /***
  * @brief ダイナミック制御モードへの移行
  */
-int seg_set_dynamic_control(seg_ctx_t *ctx)
+int segdisp_set_dynamic_control(segdisp_t *segdisp)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
-    seg_enter_dynamic_mode(ctx);
+    segdisp_enter_dynamic_mode(segdisp);
 
     return SEG_OK;
 }
@@ -306,11 +302,11 @@ int seg_set_dynamic_control(seg_ctx_t *ctx)
 /***
  * @brief スタティック制御モードへの移行
  */
-int seg_set_static_control(seg_ctx_t *ctx)
+int segdisp_set_static_control(segdisp_t *segdisp)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
-    seg_enter_static_mode(ctx);
+    segdisp_enter_static_mode(segdisp);
 
     return SEG_OK;
 }
@@ -318,47 +314,47 @@ int seg_set_static_control(seg_ctx_t *ctx)
 /***
  * @brief ダイナミック制御モードへの移行
  */
-static void seg_enter_dynamic_mode(seg_ctx_t *ctx)
+static void segdisp_enter_dynamic_mode(segdisp_t *segdisp)
 {
     /* ダイナミック制御用パラメータ初期化 */
-    ctx->control = SEG_DYNAMIC_CONTROL;
-    ctx->scan_cycle = SEG_SCAN_CYCLE_DEFAULT_MS;
-    ctx->last_scan  = ctx->timer;
-    ctx->pos        = 0;
+    segdisp->control = SEG_DYNAMIC_CONTROL;
+    segdisp->scan_cycle = SEGDISP_SCAN_CYCLE_DEFAULT_MS;
+    segdisp->last_scan  = segdisp->timer;
+    segdisp->pos        = 0;
 }
 
 /***
  * @brief スタティック制御モードへの移行
  */
-static void seg_enter_static_mode(seg_ctx_t *ctx)
+static void segdisp_enter_static_mode(segdisp_t *segdisp)
 {
     /* スタティック制御用パラメータ初期化 */
-    ctx->control = SEG_STATIC_CONTROL;
+    segdisp->control = SEG_STATIC_CONTROL;
 }
 
 /***
  * @brief 点滅設定処理
  */
-int seg_hidden_on(seg_ctx_t *ctx, uint16_t digit)
+int segdisp_hidden_on(segdisp_t *segdisp, uint16_t digit)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
     if (digit == 0)
     {
         /* 全桁の点滅設定 */
-        for (size_t i = 0; i < ctx->len; i++)
+        for (size_t i = 0; i < segdisp->len; i++)
         {
-            ctx->digit[i].state = SEG_STATE_HIDDEN;
+            segdisp->digit[i].state = SEGDISP_STATE_HIDDEN;
         }
     }
     else
     {
         uint8_t index = (digit - 1);
 
-        if (index < ctx->len)
+        if (index < segdisp->len)
         {
             /* 指定桁の点滅設定 */
-            ctx->digit[index].state = SEG_STATE_HIDDEN;
+            segdisp->digit[index].state = SEGDISP_STATE_HIDDEN;
         }
     }
 
@@ -368,26 +364,26 @@ int seg_hidden_on(seg_ctx_t *ctx, uint16_t digit)
 /***
  * @brief 点滅設定処理
  */
-int seg_hidden_off(seg_ctx_t *ctx, uint16_t digit)
+int segdisp_hidden_off(segdisp_t *segdisp, uint16_t digit)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
     if (digit == 0)
     {
         /* 全桁の点滅設定 */
-        for (size_t i = 0; i < ctx->len; i++)
+        for (size_t i = 0; i < segdisp->len; i++)
         {
-            ctx->digit[i].state = SEG_STATE_COMMON;
+            segdisp->digit[i].state = SEGDISP_STATE_COMMON;
         }
     }
     else
     {
         uint8_t index = (digit - 1);
 
-        if (index < ctx->len)
+        if (index < segdisp->len)
         {
             /* 指定桁の点滅設定 */
-            ctx->digit[index].state = SEG_STATE_COMMON;
+            segdisp->digit[index].state = SEGDISP_STATE_COMMON;
         }
     }
 
@@ -396,32 +392,32 @@ int seg_hidden_off(seg_ctx_t *ctx, uint16_t digit)
 
 /***
  * @brief 点滅設定処理
- * @param ctx セグメント状態のメモリ領域
+ * @param segdisp セグメント状態のメモリ領域
  * @param digit 桁位置(1～) / 0は全桁
  * @param cycle 点滅周期
  */
-int seg_blink_on(seg_ctx_t *ctx, uint16_t digit, uint32_t cycle)
+int segdisp_blink_on(segdisp_t *segdisp, uint16_t digit, uint32_t cycle)
 {
-    if ((ctx == NULL) || (cycle == 0)) return SEG_ARG_ERROR;
+    if ((segdisp == NULL) || (cycle == 0)) return SEG_ARG_ERROR;
 
     if (digit == 0)
     {
         /* 全桁の点滅設定 */
-        for (size_t i = 0; i < ctx->len; i++)
+        for (size_t i = 0; i < segdisp->len; i++)
         {
-            ctx->digit[i].state = SEG_STATE_BLINK;
-            ctx->digit[i].blink_cycle = cycle;
+            segdisp->digit[i].state = SEGDISP_STATE_BLINK;
+            segdisp->digit[i].blink_cycle = cycle;
         }
     }
     else
     {
         uint8_t index = (digit - 1);
 
-        if (index < ctx->len)
+        if (index < segdisp->len)
         {
             /* 指定桁の点滅設定 */
-            ctx->digit[index].state = SEG_STATE_BLINK;
-            ctx->digit[index].blink_cycle = cycle;
+            segdisp->digit[index].state = SEGDISP_STATE_BLINK;
+            segdisp->digit[index].blink_cycle = cycle;
         }
     }
 
@@ -430,29 +426,29 @@ int seg_blink_on(seg_ctx_t *ctx, uint16_t digit, uint32_t cycle)
 
 /***
  * @brief 点滅設定処理
- * @param ctx セグメント状態のメモリ領域
+ * @param segdisp セグメント状態のメモリ領域
  * @param digit 桁位置(1～) / 0は全桁
  */
-int seg_blink_off(seg_ctx_t *ctx, uint16_t digit)
+int segdisp_blink_off(segdisp_t *segdisp, uint16_t digit)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
     if (digit == 0)
     {
         /* 全桁の点滅設定 */
-        for (size_t i = 0; i < ctx->len; i++)
+        for (size_t i = 0; i < segdisp->len; i++)
         {
-            ctx->digit[i].state = SEG_STATE_COMMON;
+            segdisp->digit[i].state = SEGDISP_STATE_COMMON;
         }
     }
     else
     {
         uint8_t index = (digit - 1);
 
-        if (index < ctx->len)
+        if (index < segdisp->len)
         {
             /* 指定桁の点滅設定 */
-            ctx->digit[index].state = SEG_STATE_COMMON;
+            segdisp->digit[index].state = SEGDISP_STATE_COMMON;
         }
     }
 
@@ -461,16 +457,16 @@ int seg_blink_off(seg_ctx_t *ctx, uint16_t digit)
 
 /***
  * @brief スキャン周期設定処理
- * @param ctx セグメント状態のメモリ領域
+ * @param segdisp セグメント状態のメモリ領域
  * @param value 設定値
  */
-int seg_set_scan_cycle(seg_ctx_t *ctx, uint32_t value)
+int segdisp_set_scan_cycle(segdisp_t *segdisp, uint32_t value)
 {
-    if (ctx == NULL) return SEG_ARG_ERROR;
+    if (segdisp == NULL) return SEG_ARG_ERROR;
 
     if (value > 0)
     {
-        ctx->scan_cycle = value;
+        segdisp->scan_cycle = value;
     }
 
     return SEG_OK;

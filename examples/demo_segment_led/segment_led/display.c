@@ -44,7 +44,7 @@
 /****************************************************************************************************
  * Private Global Variables
  ****************************************************************************************************/
-seg_ctx_t segment;
+segdisp_t segment;
 
 /****************************************************************************************************
  * Private Prototype Declaration
@@ -59,21 +59,21 @@ static void digit_position_control(uint8_t position);
 void display_init(void)
 {
     /* セグメントLED制御データ初期化 */
-    seg_init(&segment, 4);
-    seg_set_dynamic_control(&segment);      /* ダイナミック制御 */
+    segdisp_init(&segment, 4);
+    segdisp_set_dynamic_control(&segment);      /* ダイナミック制御 */
 
     /* 描画コールバックとエンコードコールバックの設定 */
-    seg_set_draw_cb(&segment, draw_cb);
-    seg_set_encode_cb(&segment, encode_cb);
+    segdisp_set_draw_cb(&segment, draw_cb);
+    segdisp_set_encode_cb(&segment, encode_cb);
 
     /* "----"と描画するためのbitパターンを設定 */
-    seg_set_pattern(&segment, 1, 0x40);
-    seg_set_pattern(&segment, 2, 0x40);
-    seg_set_pattern(&segment, 3, 0x40);
-    seg_set_pattern(&segment, 4, 0x40);
+    segdisp_set_pattern(&segment, 1, 0x40);
+    segdisp_set_pattern(&segment, 2, 0x40);
+    segdisp_set_pattern(&segment, 3, 0x40);
+    segdisp_set_pattern(&segment, 4, 0x40);
 
     /* 点滅ON */
-    seg_blink_on(&segment, 0, 500);         /* blink 500ms cycle */
+    segdisp_blink_on(&segment, 0, 500);         /* blink 500ms cycle */
 }
 
 /***
@@ -82,7 +82,7 @@ void display_init(void)
  *          表示更新周期は1msを推奨。
  * 
  * @details 表示更新の流れ
- * 1. seg_update関数を周期起動する。
+ * 1. segdisp_update関数を周期起動する。
  * 2. 更新周期ごとに描画コールバック関数(draw_cb)が呼び出される。
  * 3. 描画コールバック関数内で点灯桁位置制御関数(digit_position_control)を呼び出し、点灯桁位置を制御する。
  * 4. 描画コールバック関数内でシフトレジスタへの点灯表示出力関数(_u74hc595_serial_output)を呼び出し、点灯表示を出力する。
@@ -90,7 +90,7 @@ void display_init(void)
 void display_interrupt(void)
 {
     /* 表示更新 */
-    seg_update(&segment, 1);    /* 1ms period inc */
+    segdisp_update(&segment, 1);    /* 1ms period inc */
 }
 
 /***
@@ -126,7 +126,7 @@ static uint8_t encode_cb(const uint8_t *c, uint32_t *pattern)
 
     uint8_t length = 0;
 
-    for (size_t i = 0; i < SEG_DIGIT_LENGTH; i++)
+    for (size_t i = 0; i < SEGDISP_DIGIT_MAX; i++)
     {
         if (c[i] == '\0')
         {

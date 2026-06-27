@@ -20,7 +20,7 @@
 #include "UART/uart.h"
 
 #include "display.h"
-#include "../../../../inc/segment.h"
+#include "../../../../inc/segdisp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -134,7 +134,7 @@ static int cmd_dispatch(int argc, char **argv)
 {
     if ((argc >= 3) && (strcmp(&argv[1][0], "set") == 0))
     {
-        seg_set_text(&segment, (const uint8_t *)&argv[2][0]);
+        segdisp_set_text(&segment, (const uint8_t *)&argv[2][0]);
     }
 
     else if (strcmp(&argv[1][0], "blink") == 0)
@@ -147,16 +147,16 @@ static int cmd_dispatch(int argc, char **argv)
                 cycle = 500;  /* デフォルトは500ms */
             }
 
-            seg_blink_on(&segment, 0, cycle);
+            segdisp_blink_on(&segment, 0, cycle);
         }
         else if ((argc >= 3) && (strcmp(&argv[2][0], "off") == 0))
         {
-            seg_blink_off(&segment, 0);
+            segdisp_blink_off(&segment, 0);
         }
     }
     else if ((argc >= 2) && (strcmp(&argv[1][0], "clr") == 0))
     {
-        seg_set_pattern(&segment, 0, 0);
+        segdisp_set_pattern(&segment, 0, 0);
     }
     else
     {
